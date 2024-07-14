@@ -55,7 +55,71 @@ class EncryptionPanel(wx.Panel):
         super(EncryptionPanel, self).__init__(parent)
         self.switch_panel_callback = switch_panel_callback
         
-        label = wx.StaticText(self, label="Encryption Page")
+        label = wx.StaticText(self, label="Encryption")
+        
+        button = wx.Button(self, label="Back")
+        button.Bind(wx.EVT_BUTTON, lambda event: self.switch_panel_callback('main_panel'))
+        
+        sizer = wx.BoxSizer(wx.VERTICAL)
+        sizer.Add(label, 0, wx.ALL, 10)
+        sizer.Add(button, 0, wx.ALL, 10)
+        
+        self.SetSizer(sizer)
+
+class HardeningPanel(wx.Panel):
+    def __init__(self, parent, switch_panel_callback):
+        super(HardeningPanel, self).__init__(parent)
+        self.switch_panel_callback = switch_panel_callback
+        
+        label = wx.StaticText(self, label="Hardening Script")
+        
+        button = wx.Button(self, label="Back")
+        button.Bind(wx.EVT_BUTTON, lambda event: self.switch_panel_callback('main_panel'))
+        
+        sizer = wx.BoxSizer(wx.VERTICAL)
+        sizer.Add(label, 0, wx.ALL, 10)
+        sizer.Add(button, 0, wx.ALL, 10)
+        
+        self.SetSizer(sizer)
+
+class FirejailPanel(wx.Panel):
+    def __init__(self, parent, switch_panel_callback):
+        super(FirejailPanel, self).__init__(parent)
+        self.switch_panel_callback = switch_panel_callback
+        
+        label = wx.StaticText(self, label="Setup Firejail")
+        
+        button = wx.Button(self, label="Back")
+        button.Bind(wx.EVT_BUTTON, lambda event: self.switch_panel_callback('main_panel'))
+        
+        sizer = wx.BoxSizer(wx.VERTICAL)
+        sizer.Add(label, 0, wx.ALL, 10)
+        sizer.Add(button, 0, wx.ALL, 10)
+        
+        self.SetSizer(sizer)
+
+class LockPanel(wx.Panel):
+    def __init__(self, parent, switch_panel_callback):
+        super(LockPanel, self).__init__(parent)
+        self.switch_panel_callback = switch_panel_callback
+        
+        label = wx.StaticText(self, label="Lock Root Account")
+        
+        button = wx.Button(self, label="Back")
+        button.Bind(wx.EVT_BUTTON, lambda event: self.switch_panel_callback('main_panel'))
+        
+        sizer = wx.BoxSizer(wx.VERTICAL)
+        sizer.Add(label, 0, wx.ALL, 10)
+        sizer.Add(button, 0, wx.ALL, 10)
+        
+        self.SetSizer(sizer)
+
+class FirewallPanel(wx.Panel):
+    def __init__(self, parent, switch_panel_callback):
+        super(FirewallPanel, self).__init__(parent)
+        self.switch_panel_callback = switch_panel_callback
+        
+        label = wx.StaticText(self, label="Configure Firewall")
         
         button = wx.Button(self, label="Back")
         button.Bind(wx.EVT_BUTTON, lambda event: self.switch_panel_callback('main_panel'))
@@ -77,11 +141,19 @@ class MenuFrame(wx.Frame):
         # Initialize panels
         self.main_panel = MainPanel(self, self.switch_panel)
         self.encryption_panel = EncryptionPanel(self, self.switch_panel)
+        self.hardening_panel = HardeningPanel(self, self.switch_panel)
+        self.firejail_panel = FirejailPanel(self, self.switch_panel)
+        self.lock_panel = LockPanel(self, self.switch_panel)
+        self.firewall_panel = FirewallPanel(self, self.switch_panel)
         
         # Use a dictionary to store panels
         self.panels = {
             'main_panel': self.main_panel,
             'encryption_panel': self.encryption_panel,
+            'hardening_panel': self.hardening_panel,
+            'firejail_panel': self.firejail_panel,
+            'lock_panel': self.lock_panel,
+            'firewall_panel':self.firewall_panel
         }
         
         # Set the frame sizer and show the main panel
