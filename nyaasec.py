@@ -1,4 +1,8 @@
+import os
 import wx
+import subprocess
+import threading
+import sys
 
 class MainPanel(wx.Panel):
     def __init__(self, parent, switch_panel_callback):
@@ -14,7 +18,8 @@ class MainPanel(wx.Panel):
         self.button_title = wx.StaticText(self, label="Security Utilities")
 
         # Load an image
-        image = wx.Bitmap("./Nyaa.png", wx.BITMAP_TYPE_PNG)
+        image_path = "./Nyaa.png"
+        image = wx.Bitmap(image_path, wx.BITMAP_TYPE_PNG)
         
         # Create a StaticBitmap to display the image
         self.kitty_ctrl = wx.StaticBitmap(self, bitmap=image)
@@ -87,32 +92,114 @@ class FirejailPanel(wx.Panel):
         super(FirejailPanel, self).__init__(parent)
         self.switch_panel_callback = switch_panel_callback
         
+        # Set up the text
         label = wx.StaticText(self, label="Setup Firejail")
-        
+        body = wx.StaticText(self, label="Firejail is state-of-the-art sandbox software for Linux that prevents applications from having access to files and processes unnecessary for their functioning. Using it is recommended for optimal security. This script will install Firejail if it is not present on your system and configure your applications to use it.")
+        body.Wrap(350)
+
+        # Set up the buttons
         button = wx.Button(self, label="Back")
+        firejail_button = wx.Button(self, label="Setup Firejail")
         button.Bind(wx.EVT_BUTTON, lambda event: self.switch_panel_callback('main_panel'))
+        firejail_button.Bind(wx.EVT_BUTTON, lambda event: self.on_firejail_click(event))
         
-        sizer = wx.BoxSizer(wx.VERTICAL)
-        sizer.Add(label, 0, wx.ALL, 10)
-        sizer.Add(button, 0, wx.ALL, 10)
+        # Output box to view the result
+        self.output_box = wx.TextCtrl(self, size=(350, 250), style=wx.TE_MULTILINE | wx.TE_READONLY | wx.HSCROLL)
+
+        # Distribution choice
+        dist_label = wx.StaticText(self, label="Select your distribution:")
+        self.dist_choice = wx.Choice(self, choices=["Ubuntu/Debian", "Fedora", "Arch Linux"])
+        self.dist_choice.SetSelection(0)  # Default to the first option
+
+        # Create a vertical box sizer
+        vbox = wx.BoxSizer(wx.VERTICAL)
         
-        self.SetSizer(sizer)
+        # Add widgets to the sizer with flag to center them
+        vbox.Add(label, 0, wx.ALIGN_CENTER | wx.TOP, 20)
+        vbox.Add(body, 0, wx.ALIGN_CENTER | wx.TOP, 20)
+        vbox.Add(dist_label, 0, wx.ALIGN_CENTER | wx.TOP, 20)
+        vbox.Add(self.dist_choice, 0, wx.ALIGN_CENTER | wx.TOP, 20)
+        vbox.Add(firejail_button, 0, wx.ALIGN_CENTER | wx.TOP, 40)        
+        vbox.Add(self.output_box, 0, wx.ALIGN_CENTER | wx.TOP, 40)
+        vbox.Add(button, 0, wx.ALIGN_CENTER | wx.TOP, 100)
+
+        # Set the sizer for the panel
+        self.SetSizer(vbox)
+
+    def on_firejail_click(self, event):
+        # Get the selected distribution
+        dist = self.dist_choice.GetString(self.dist_choice.GetSelection())
+        
+        # Define the command based on the selected distribution
+        if dist == "Ubuntu/Debian":
+            command = "apt-get update && apt-get install -y firejail && firecfg --fix-sound"
+        elif dist == "Fedora":
+            command = "dnf install -y firejail && firecfg --fix-sound"
+        elif dist == "Arch Linux":
+            command = "pacman -Syu --noconfirm firejail && firecfg --fix-sound"
+        else:
+            command = "echo 'Unsupported distribution selected'"
+        
+        # Run the command in a separate thread
+        threading.Thread(target=self.run_command, args=(command,)).start()
+
+    def run_command(self, command):
+        process = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        
+        for line in process.stdout:
+            wx.CallAfter(self.append_output, line)
+        for line in process.stderr:
+            wx.CallAfter(self.append_output, line)
+        
+        process.stdout.close()
+        process.stderr.close()
+        process.wait()
+    
+    def append_output(self, text):
+        self.output_box.AppendText(text)
+
 
 class LockPanel(wx.Panel):
     def __init__(self, parent, switch_panel_callback):
         super(LockPanel, self).__init__(parent)
         self.switch_panel_callback = switch_panel_callback
         
+        # Set up the text
         label = wx.StaticText(self, label="Lock Root Account")
-        
+        body = wx.StaticText(self, label="This will make the root account inaccessible via login, which can increase security. Make sure you have a utility like sudo or doas to run commands as root or your user is in the WHEEL group.")
+        body.Wrap(350)
+
+        # Set up the buttons
         button = wx.Button(self, label="Back")
+        lock_button = wx.Button(self, label="Disable it")
         button.Bind(wx.EVT_BUTTON, lambda event: self.switch_panel_callback('main_panel'))
+        lock_button.Bind(wx.EVT_BUTTON, lambda event: self.on_disable_click(event))
         
-        sizer = wx.BoxSizer(wx.VERTICAL)
-        sizer.Add(label, 0, wx.ALL, 10)
-        sizer.Add(button, 0, wx.ALL, 10)
+        # Output box to view the result
+        self.output_box = wx.TextCtrl(self, size=(350, 450), style=wx.TE_MULTILINE | wx.TE_READONLY | wx.HSCROLL)
+
+        # Create a vertical box sizer
+        vbox = wx.BoxSizer(wx.VERTICAL)
         
-        self.SetSizer(sizer)
+        # Add widgets to the sizer with flag to center them
+        vbox.Add(label, 0, wx.ALIGN_CENTER | wx.TOP, 20)
+        vbox.Add(body, 0, wx.ALIGN_CENTER | wx.TOP, 20)
+        vbox.Add(lock_button, 0, wx.ALIGN_CENTER | wx.TOP, 40)
+        vbox.Add(self.output_box, 0, wx.ALIGN_CENTER | wx.TOP, 40)
+        vbox.Add(button, 0, wx.ALIGN_CENTER | wx.TOP, 30)
+
+        # Set the sizer for the panel
+        self.SetSizer(vbox)
+    
+    def on_disable_click(self, event):
+        command = "sudo passwd -l root"
+        process = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        stdout, stderr = process.communicate()
+        
+        # Display the output in the TextCtrl
+        self.output_box.SetValue(stdout.decode() + stderr.decode())
+
+
 
 class FirewallPanel(wx.Panel):
     def __init__(self, parent, switch_panel_callback):
