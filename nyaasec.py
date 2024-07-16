@@ -55,6 +55,7 @@ class MainPanel(wx.Panel):
         # Set the sizer for the panel
         self.SetSizer(vbox)
 
+# Panel to encrypt block devices using LUKS
 class EncryptionPanel(wx.Panel):
     def __init__(self, parent, switch_panel_callback):
         super(EncryptionPanel, self).__init__(parent)
@@ -71,22 +72,62 @@ class EncryptionPanel(wx.Panel):
         
         self.SetSizer(sizer)
 
+# Panel for running the hardening script
 class HardeningPanel(wx.Panel):
     def __init__(self, parent, switch_panel_callback):
         super(HardeningPanel, self).__init__(parent)
         self.switch_panel_callback = switch_panel_callback
         
-        label = wx.StaticText(self, label="Hardening Script")
-        
-        button = wx.Button(self, label="Back")
-        button.Bind(wx.EVT_BUTTON, lambda event: self.switch_panel_callback('main_panel'))
-        
-        sizer = wx.BoxSizer(wx.VERTICAL)
-        sizer.Add(label, 0, wx.ALL, 10)
-        sizer.Add(button, 0, wx.ALL, 10)
-        
-        self.SetSizer(sizer)
+        # Set up the text
+        label = wx.StaticText(self, label="Run Hardening Script")
+        body = wx.StaticText(self, label="Runs a hardening script that sets secure kernel parameters and installs linux-hardened or equivalent security modules depending on your distribution. Good for basic security on any supported GNU/Linux system.")
+        body.Wrap(350)
 
+        # Set up the buttons
+        button = wx.Button(self, label="Back")
+        lock_button = wx.Button(self, label="Run script")
+        button.Bind(wx.EVT_BUTTON, lambda event: self.switch_panel_callback('main_panel'))
+        lock_button.Bind(wx.EVT_BUTTON, lambda event: self.on_hardening_click(event))
+        
+        # Output box to view the result
+        self.output_box = wx.TextCtrl(self, size=(350, 450), style=wx.TE_MULTILINE | wx.TE_READONLY | wx.HSCROLL)
+
+        # Create a vertical box sizer
+        vbox = wx.BoxSizer(wx.VERTICAL)
+        
+        # Add widgets to the sizer with flag to center them
+        vbox.Add(label, 0, wx.ALIGN_CENTER | wx.TOP, 20)
+        vbox.Add(body, 0, wx.ALIGN_CENTER | wx.TOP, 20)
+        vbox.Add(lock_button, 0, wx.ALIGN_CENTER | wx.TOP, 40)
+        vbox.Add(self.output_box, 0, wx.ALIGN_CENTER | wx.TOP, 40)
+        vbox.Add(button, 0, wx.ALIGN_CENTER | wx.TOP, 30)
+
+        # Set the sizer for the panel
+        self.SetSizer(vbox)
+    
+    def on_hardening_click(self, event):
+        # Define the command to run the script
+        command = "chmod +x hardening.sh && ./hardening.sh"
+        
+        # Run the command in a separate thread
+        threading.Thread(target=self.run_command, args=(command,)).start()
+
+    def run_command(self, command):
+        process = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        
+        for line in process.stdout:
+            wx.CallAfter(self.append_output, line)
+        for line in process.stderr:
+            wx.CallAfter(self.append_output, line)
+        
+        process.stdout.close()
+        process.stderr.close()
+        process.wait()
+    
+    def append_output(self, text):
+        self.output_box.AppendText(text)
+
+# Class for the panel containing the Firejail script
 class FirejailPanel(wx.Panel):
     def __init__(self, parent, switch_panel_callback):
         super(FirejailPanel, self).__init__(parent)
@@ -158,7 +199,7 @@ class FirejailPanel(wx.Panel):
     def append_output(self, text):
         self.output_box.AppendText(text)
 
-
+# Panel for locking the root account
 class LockPanel(wx.Panel):
     def __init__(self, parent, switch_panel_callback):
         super(LockPanel, self).__init__(parent)
@@ -199,6 +240,7 @@ class LockPanel(wx.Panel):
         # Display the output in the TextCtrl
         self.output_box.SetValue(stdout.decode() + stderr.decode())
 
+# Panel for getting firewall configuration information
 class FirewallPanel(wx.Panel):
     def __init__(self, parent, switch_panel_callback):
         super(FirewallPanel, self).__init__(parent)
@@ -244,7 +286,7 @@ class FirewallPanel(wx.Panel):
             echo "nftables is installed."
             nft list ruleset
         else
-            echo "Neither iptables nor nftables is installed."
+            echo "Neither iptables nor nftables is installed. Run hardening script to install."
             exit 1
         fi
         """
@@ -267,13 +309,10 @@ class FirewallPanel(wx.Panel):
     def append_output(self, text):
         self.output_box.AppendText(text)
 
+# Frame for the entire application
 class MenuFrame(wx.Frame):
     def __init__(self, parent, title):
         super(MenuFrame, self).__init__(parent, title=title, size=(400, 800))
-        
-        # Set the icon
-        # icon = wx.Icon("./nyaa.ico", wx.BITMAP_TYPE_ICO)
-        # self.SetIcon(icon)
         
         # Initialize panels
         self.main_panel = MainPanel(self, self.switch_panel)
