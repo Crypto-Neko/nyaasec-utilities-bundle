@@ -29,7 +29,7 @@ class MainPanel(wx.Panel):
         self.hardening_button = wx.Button(self, label='Run Hardening Script', size=(200, 40))
         self.firejail_button = wx.Button(self, label='Setup Firejail', size=(200, 40))
         self.lock_button = wx.Button(self, label='Lock Root Account', size=(200, 40))
-        self.firewall_button = wx.Button(self, label='Configure Firewall', size=(200, 40))
+        self.firewall_button = wx.Button(self, label='Check Firewall', size=(200, 40))
 
         # Bind buttons to switch panel events
         self.crypt_button.Bind(wx.EVT_BUTTON, lambda event: self.switch_panel_callback('encryption_panel'))
@@ -199,23 +199,73 @@ class LockPanel(wx.Panel):
         # Display the output in the TextCtrl
         self.output_box.SetValue(stdout.decode() + stderr.decode())
 
-
-
 class FirewallPanel(wx.Panel):
     def __init__(self, parent, switch_panel_callback):
         super(FirewallPanel, self).__init__(parent)
         self.switch_panel_callback = switch_panel_callback
         
-        label = wx.StaticText(self, label="Configure Firewall")
-        
+        # Set up the text
+        label = wx.StaticText(self, label="Check Firewall")
+        body = wx.StaticText(self, label="Checks which firewall application is installed and prints the table of rules currently in use.")
+        body.Wrap(350)
+
+        # Set up the buttons
         button = wx.Button(self, label="Back")
+        firewall_button = wx.Button(self, label="Check Firewall")
         button.Bind(wx.EVT_BUTTON, lambda event: self.switch_panel_callback('main_panel'))
+        firewall_button.Bind(wx.EVT_BUTTON, lambda event: self.on_firewall_click(event))
         
-        sizer = wx.BoxSizer(wx.VERTICAL)
-        sizer.Add(label, 0, wx.ALL, 10)
-        sizer.Add(button, 0, wx.ALL, 10)
+        # Output box to view the result
+        self.output_box = wx.TextCtrl(self, size=(350, 250), style=wx.TE_MULTILINE | wx.TE_READONLY | wx.HSCROLL)
+
+        # Create a vertical box sizer
+        vbox = wx.BoxSizer(wx.VERTICAL)
         
-        self.SetSizer(sizer)
+        # Add widgets to the sizer with flag to center them
+        vbox.Add(label, 0, wx.ALIGN_CENTER | wx.TOP, 20)
+        vbox.Add(body, 0, wx.ALIGN_CENTER | wx.TOP, 20)
+        vbox.Add(firewall_button, 0, wx.ALIGN_CENTER | wx.TOP, 40)        
+        vbox.Add(self.output_box, 0, wx.ALIGN_CENTER | wx.TOP, 40)
+        vbox.Add(button, 0, wx.ALIGN_CENTER | wx.TOP, 270)
+
+        # Set the sizer for the panel
+        self.SetSizer(vbox)
+
+    def on_firewall_click(self, event):
+        # Get the selected distribution
+        firewall_script = """
+        #!/bin/bash
+        
+        # Check for iptables or nftables
+        if command -v iptables > /dev/null 2>&1; then
+            echo "iptables is installed."
+            iptables -L
+        elif command -v nft > /dev/null 2>&1; then
+            echo "nftables is installed."
+            nft list ruleset
+        else
+            echo "Neither iptables nor nftables is installed."
+            exit 1
+        fi
+        """
+        
+        # Run the command in a separate thread
+        threading.Thread(target=self.run_command, args=(firewall_script,)).start()
+
+    def run_command(self, command):
+        process = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        
+        for line in process.stdout:
+            wx.CallAfter(self.append_output, line)
+        for line in process.stderr:
+            wx.CallAfter(self.append_output, line)
+        
+        process.stdout.close()
+        process.stderr.close()
+        process.wait()
+    
+    def append_output(self, text):
+        self.output_box.AppendText(text)
 
 class MenuFrame(wx.Frame):
     def __init__(self, parent, title):
