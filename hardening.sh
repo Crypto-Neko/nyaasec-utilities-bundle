@@ -12,7 +12,7 @@ if [[ "$distro" == "ubuntu" || "$distro" == "debian" || "$distro" == "Ubuntu" ||
 	sysctl -p
 elif [[ "$distro" == "arch" || "$distro" == "Arch" ]]; then
 	pacman -Syu
-	pacman -Sy linux-hardened
+	pacman -Sy linux-hardened linux-hardened-headers
 	mkinitcpio -p linux-hardened
 elif [[ "$distro" == "fedora" || "$distro" == "Fedora" ]]; then
 	dnf update -y
@@ -24,10 +24,9 @@ fi
 # Set secure kernel parameters
 sysctl -w kernel.kptr_restrict=2
 sysctl -w kernel.dmesg_restrict=1
-sysctl -w kernel.printk="3 3 3 3"
 sysctl -w net.core.bpf_jit_harden=2
+sysctl -w kernel.printk="3 3 3 3"
 sysctl -w dev.tty.ldisc_autoload=0
-sysctl -w kernel.sysrq=4
 sysctl -w kernel.perf_event_paranoid=3
 
 # Set network hardening parameters

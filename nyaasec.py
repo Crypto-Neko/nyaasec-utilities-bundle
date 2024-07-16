@@ -2,6 +2,7 @@ import os
 import wx
 import subprocess
 import threading
+import tempfile
 import sys
 
 class MainPanel(wx.Panel):
@@ -61,16 +62,93 @@ class EncryptionPanel(wx.Panel):
         super(EncryptionPanel, self).__init__(parent)
         self.switch_panel_callback = switch_panel_callback
         
-        label = wx.StaticText(self, label="Encryption")
-        
+        # Set up the text
+        label = wx.StaticText(self, label="Encrypt a Device or Partition")
+        body = wx.StaticText(self, label="Allows the user to encrypt a block device with LUKS using state-of-the-art 256-bit AES encryption. Select a block device, choose a password, and then mount the device using your operating system's device manager or file viewer (e.g. Disks, Files, Dolphin, etc.")
+        body.Wrap(350)
+
+        # Set up the buttons
         button = wx.Button(self, label="Back")
+        encrypt_button = wx.Button(self, label="Begin encryption")
         button.Bind(wx.EVT_BUTTON, lambda event: self.switch_panel_callback('main_panel'))
+        encrypt_button.Bind(wx.EVT_BUTTON, lambda event: self.on_encrypt_click(event))
         
-        sizer = wx.BoxSizer(wx.VERTICAL)
-        sizer.Add(label, 0, wx.ALL, 10)
-        sizer.Add(button, 0, wx.ALL, 10)
+        # Output box to view the result
+        self.output_box = wx.TextCtrl(self, size=(350, 250), style=wx.TE_MULTILINE | wx.TE_READONLY | wx.HSCROLL)
+
+        # Get the list of block devices from which to choose
+        self.device_choice = wx.Choice(self, choices=self.get_block_devices())
+
+        # Get the password
+        self.password1 = wx.TextCtrl(self, style=wx.TE_PASSWORD)
+        self.password2 = wx.TextCtrl(self, style=wx.TE_PASSWORD)
+        pwd_label1 = wx.StaticText(self, label="Enter password:")
+        pwd_label2 = wx.StaticText(self, label="Re-enter password:")
         
-        self.SetSizer(sizer)
+        # Create a vertical box sizer
+        vbox = wx.BoxSizer(wx.VERTICAL)
+        
+        # Add widgets to the sizer with flag to center them
+        vbox.Add(label, 0, wx.ALIGN_CENTER | wx.TOP, 20)
+        vbox.Add(body, 0, wx.ALIGN_CENTER | wx.TOP, 20)
+
+        # Create a horizontal box sizer for device selection and encrypt button
+        hbox_device = wx.BoxSizer(wx.HORIZONTAL)
+        hbox_device.Add(self.device_choice, 0, wx.ALL, 10)
+        hbox_device.Add(encrypt_button, 0, wx.ALL, 10)
+        
+        vbox.Add(pwd_label1, 0, wx.ALIGN_CENTER | wx.TOP, 20)
+        vbox.Add(self.password1, 0, wx.ALIGN_CENTER | wx.TOP, 20)
+        vbox.Add(pwd_label2, 0, wx.ALIGN_CENTER | wx.TOP, 20)
+        vbox.Add(self.password2, 0, wx.ALIGN_CENTER | wx.TOP, 20)
+        vbox.Add(hbox_device, 0, wx.ALIGN_CENTER | wx.TOP, 20)        
+        vbox.Add(self.output_box, 0, wx.ALIGN_CENTER | wx.TOP, 30)
+        vbox.Add(button, 0, wx.ALIGN_CENTER | wx.TOP, 40)
+
+        # Set the sizer for the panel
+        self.SetSizer(vbox)
+    
+    # Get all available block devices
+    def get_block_devices(self):
+        result = subprocess.run(["lsblk", "-d", "-n", "-o", "NAME"], capture_output=True, text=True)
+        devices = result.stdout.split()
+        return ["/dev/" + device for device in devices]
+
+    # Handle button clicks
+    def on_encrypt_click(self, event):
+        # Check that passwords are equal and perform the encryption if so
+        device = self.device_choice.GetStringSelection()
+        password1 = self.password1.GetValue()
+        password2 = self.password2.GetValue()
+        if password1 != password2:
+            self.append_output("Passwords must be the same.")
+            return
+
+        # Automate the password entry
+        with tempfile.NamedTemporaryFile(delete=False) as tmpfile:
+            # Write password to the file
+            tmpfile.write(password1.encode('utf-8'))
+            tmpfile.flush()
+            tmpfile_name = tmpfile.name
+
+        command = f"printf 'YES\n' | sudo cryptsetup luksFormat {device} --key-file {tmpfile_name} && echo Device encrypted."
+        
+        # Run the command in a separate thread
+        threading.Thread(target=self.run_command, args=(command, tmpfile_name)).start()
+
+    def run_command(self, command, tmpfile_name):
+        try:
+            process = subprocess.run(command, shell=True, capture_output=True, text=True)
+            output = process.stdout + process.stderr
+        except subprocess.CalledProcessError as e:
+            output = f"An error occurred: {str(e)}"
+        finally:
+            os.remove(tmpfile_name)
+        
+        wx.CallAfter(self.append_output, output)
+    
+    def append_output(self, text):
+        self.output_box.AppendText(text + '\n')
 
 # Panel for running the hardening script
 class HardeningPanel(wx.Panel):
@@ -105,6 +183,7 @@ class HardeningPanel(wx.Panel):
         # Set the sizer for the panel
         self.SetSizer(vbox)
     
+    # Handle button clicks
     def on_hardening_click(self, event):
         # Define the command to run the script
         command = "chmod +x hardening.sh && ./hardening.sh"
@@ -167,6 +246,7 @@ class FirejailPanel(wx.Panel):
         # Set the sizer for the panel
         self.SetSizer(vbox)
 
+    # Handle button clicks
     def on_firejail_click(self, event):
         # Get the selected distribution
         dist = self.dist_choice.GetString(self.dist_choice.GetSelection())
@@ -232,6 +312,7 @@ class LockPanel(wx.Panel):
         # Set the sizer for the panel
         self.SetSizer(vbox)
     
+    # Handle button clicks
     def on_disable_click(self, event):
         command = "sudo passwd -l root"
         process = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
@@ -273,6 +354,7 @@ class FirewallPanel(wx.Panel):
         # Set the sizer for the panel
         self.SetSizer(vbox)
 
+    # Handle button clicks
     def on_firewall_click(self, event):
         # Get the selected distribution
         firewall_script = """
