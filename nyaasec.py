@@ -4,7 +4,14 @@ import subprocess
 import threading
 import tempfile
 import sys
+import pkg_resources
 
+# Setup paths to compile the program into a single binary
+nyaa_path = pkg_resources.resource_filename(__name__, 'Nyaa.png')
+hardening_path = pkg_resources.resource_filename(__name__, 'hardening.sh')
+
+
+# The panel for the main menu
 class MainPanel(wx.Panel):
     def __init__(self, parent, switch_panel_callback):
         super(MainPanel, self).__init__(parent)
@@ -18,9 +25,8 @@ class MainPanel(wx.Panel):
         self.subtitle = wx.StaticText(self, label="GUI-based security and hardening application")
         self.button_title = wx.StaticText(self, label="Security Utilities")
 
-        # Load an image
-        image_path = "./Nyaa.png"
-        image = wx.Bitmap(image_path, wx.BITMAP_TYPE_PNG)
+        # Load the image
+        image = wx.Bitmap(nyaa_path, wx.BITMAP_TYPE_PNG)
         
         # Create a StaticBitmap to display the image
         self.kitty_ctrl = wx.StaticBitmap(self, bitmap=image)
@@ -186,10 +192,75 @@ class HardeningPanel(wx.Panel):
     # Handle button clicks
     def on_hardening_click(self, event):
         # Define the command to run the script
-        command = "chmod +x hardening.sh && ./hardening.sh"
+        script = """
+        #!/bin/bash
+
+        # Get the distro
+        . /etc/os-release
+        export distro=$ID
+
+        # Update repositories and install relevant packaged
+        if [[ "$distro" == "ubuntu" || "$distro" == "debian" || "$distro" == "Ubuntu" || "$distro" == "Debian" ]]; then
+	        apt-get update
+	        apt-get install libpam-apparmor
+	        apt-get install sysctl-hardening
+	        sysctl -p
+        elif [[ "$distro" == "arch" || "$distro" == "Arch" ]]; then
+        	pacman -Syu
+        	pacman -Sy linux-hardened linux-hardened-headers
+        	mkinitcpio -p linux-hardened
+        elif [[ "$distro" == "fedora" || "$distro" == "Fedora" ]]; then
+        	dnf update -y
+        	dnf install hardened-sources
+        	dnf install audit
+        	dnf install aide
+        fi
+
+        # Set secure kernel parameters
+        sysctl -w kernel.kptr_restrict=2
+        sysctl -w kernel.dmesg_restrict=1
+        sysctl -w net.core.bpf_jit_harden=2
+        sysctl -w kernel.printk="3 3 3 3"
+        sysctl -w dev.tty.ldisc_autoload=0
+        sysctl -w kernel.perf_event_paranoid=3
+
+        # Set network hardening parameters
+        sysctl -w net.ipv4.tcp_syncookies=1
+        sysctl -w net.ipv4.tcp_rfc1337=1
+        sysctl -w net.ipv4.conf.all.rp_filter=1
+        sysctl -w net.ipv4.conf.default.rp_filter=1
+        sysctl -w net.ipv4.conf.all.accept_redirects=0
+        sysctl -w net.ipv4.conf.default.accept_redirects=0
+        sysctl -w net.ipv4.conf.all.secure_redirects=0
+        sysctl -w net.ipv4.conf.default.secure_redirects=0
+        sysctl -w net.ipv6.conf.all.accept_redirects=0
+        sysctl -w net.ipv6.conf.default.accept_redirects=0
+        sysctl -w net.ipv4.conf.all.send_redirects=0
+        sysctl -w net.ipv4.conf.default.send_redirects=0
+        sysctl -w net.ipv4.icmp_echo_ignore_all=1
+        sysctl -w net.ipv4.conf.all.accept_source_route=0
+        sysctl -w net.ipv4.conf.default.accept_source_route=0
+        sysctl -w net.ipv6.conf.all.accept_source_route=0
+        sysctl -w net.ipv6.conf.default.accept_source_route=0
+        sysctl -w net.ipv6.conf.all.accept_ra=0
+        sysctl -w net.ipv6.conf.default.accept_ra=0
+
+        # Userspace kernel parameters
+        sysctl -w kernel.yama.ptrace_scope=2
+        sysctl -w vm.mmap_rnd_bits=32
+        sysctl -w vm.mmap_rnd_compat_bits=16
+        sysctl -w fs.protected_symlinks=1
+        sysctl -w fs.protected_hardlinks=1
+        sysctl -w fs.protected_fifos=2
+        sysctl -w fs.protected_regular=2
+
+        # Notify the user that the script has successfully exited.
+        echo "***"
+        echo "Script completed successfully. You may hit \"Back\" now."
+        """
         
         # Run the command in a separate thread
-        threading.Thread(target=self.run_command, args=(command,)).start()
+        threading.Thread(target=self.run_command, args=(script,)).start()
 
     def run_command(self, command):
         process = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
