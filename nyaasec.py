@@ -6,10 +6,8 @@ import tempfile
 import sys
 import pkg_resources
 
-# Setup paths to compile the program into a single binary
+# Setup the image path to compile the program into a single binary
 nyaa_path = pkg_resources.resource_filename(__name__, 'Nyaa.png')
-hardening_path = pkg_resources.resource_filename(__name__, 'hardening.sh')
-
 
 # The panel for the main menu
 class MainPanel(wx.Panel):
