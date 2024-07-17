@@ -135,7 +135,7 @@ class EncryptionPanel(wx.Panel):
             tmpfile.flush()
             tmpfile_name = tmpfile.name
 
-        command = f"printf 'YES\n' | cryptsetup luksFormat {device} --key-file {tmpfile_name} && cryptsetup luksOpen {device} nyaa_crypt_device && mkfs.ext4 /dev/mapper/nyaa_crypt_device && cryptsetup luksClose nyaa_crypt_device && echo Device encrypted."
+        command = f"printf 'YES\n' | cryptsetup luksFormat {device} --batch-mode -q --key-file {tmpfile_name} && cryptsetup luksOpen {device} nyaa_crypt_device --key-file={tmpfile_name} && mkfs.ext4 /dev/mapper/nyaa_crypt_device && cryptsetup luksClose nyaa_crypt_device --batch-mode && echo Device encrypted."
         
         # Run the command in a separate thread
         threading.Thread(target=self.run_command, args=(command, tmpfile_name)).start()
