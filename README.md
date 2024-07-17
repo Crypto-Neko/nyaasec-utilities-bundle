@@ -6,6 +6,8 @@ The NyaaSec Utilities Bundle is a collection of scripts that can serve to harden
 My main motivation behind making this is to learn how to use wxWidgets (especially for Python) to make security software, which will help me create NyaaCrypt, a much bigger project I'll be starting now that this has been released.
 Other than for practice, I hope this helps someone with less experience harden their Linux system: I'll be using it on future installs to quickly set my system up with just a few clicks.
 
+You need to run the program as root or with a utiility like sudo or doas to use all features. You may be prompted for your password if you run it in a terminal.
+
 ### Features
 
 1. **Encrypt a Device or Partition**: Allows the encryption of a block device in a few clicks using LUKS with 256-bit AES encryption.
